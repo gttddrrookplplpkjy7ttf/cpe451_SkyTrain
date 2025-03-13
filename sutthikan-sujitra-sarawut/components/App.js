@@ -2,7 +2,7 @@ import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import TabbarScreen from "./TabBar.js";  // นำเข้า TabBar.js ที่เราสร้างไว้
-import MapScreen from "./map";  // ไฟล์ที่สร้างไว้
+import MapScreen from "./map.js";  // ไฟล์ที่สร้างไว้
 import MathScreen from "./math.js";  // ไฟล์ที่สร้างไว้
 import SearchScreen from "./Search.js";  // ไฟล์ที่สร้างไว้
 

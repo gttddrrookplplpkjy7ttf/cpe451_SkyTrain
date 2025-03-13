@@ -3,8 +3,8 @@ import { View, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
-import HomeScreen from './HomeScreen';
-import MapScreen from "./map"; // ไฟล์ที่สร้างไว้
+import HomeScreen from './HomeScreen.js';
+import MapScreen from "./map.js"; // ไฟล์ที่สร้างไว้
 import TravelCostScreen from "./math.js"; // ไฟล์ที่สร้างไว้
 import SettingsScreen from "./setting.js"; // ไฟล์ที่สร้างไว้
 
