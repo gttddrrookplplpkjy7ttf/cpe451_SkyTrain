@@ -3,6 +3,9 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput } from 'r
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { btsStations } from './BusStation';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
+
 
 // คำนวณระยะทางระหว่าง 2 จุด (Haversine Formula)
 const getDistance = (lat1, lon1, lat2, lon2) => {
@@ -25,6 +28,16 @@ const RouteSearchScreen = () => {
   const [filteredStations, setFilteredStations] = useState(btsStations);
   const route = useRoute();
   const { startLocation } = route.params || {}; // รับค่าพิกัดที่ถูกส่งมา
+
+  // รีเซ็ตค่าทุกครั้งที่เข้ามาหน้านี้ใหม่
+useFocusEffect(
+  useCallback(() => {
+    setEndText('');
+    setEndStation(null);
+    setFilteredStations(btsStations);
+  }, [])
+);
+
   
   useEffect(() => {
     if (startLocation) {

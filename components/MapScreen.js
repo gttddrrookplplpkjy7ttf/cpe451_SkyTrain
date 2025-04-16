@@ -5,10 +5,11 @@ import { useRoute } from '@react-navigation/native';
 import { FontAwesome } from '@expo/vector-icons';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { btsStations } from './BusStation';
 
 const MapScreen = () => {
   const route = useRoute();
-  const { startStation, endStation, busStations } = route.params || {}; // รับข้อมูลสถานีต้นทาง, ปลายทาง และ busStations จาก RouteSearchScreen
+  const { startStation, endStation } = route.params || {}; // รับข้อมูลสถานีต้นทาง, ปลายทาง 
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [endStationVisible, setEndStationVisible] = useState(true); // เพิ่มสถานะสำหรับแสดงหมุดปลายทาง
   const navigation = useNavigation();
@@ -24,15 +25,52 @@ const MapScreen = () => {
     }
   }, [startStation, endStation]);
 
-  // ฟังก์ชันสำหรับสร้างเส้นทางจากข้อมูลสถานี
+  // ฟังก์ชันสำหรับสร้างเส้นทางจากข้อมูล busStations ทั้งหมด
   const generateRoute = (start, end) => {
-    const coordinates = [
-      { latitude: start.lat, longitude: start.lon },
-      { latitude: end.lat, longitude: end.lon },
-    ];
-
-    setRouteCoordinates(coordinates); // ตั้งค่าเส้นทางที่ได้
+    if (!start || !start.name || !end || !end.name) {
+      console.warn("Start หรือ End ยังไม่ถูกเลือก:", { start, end });
+      Alert.alert("Error", "กรุณาเลือกสถานีต้นทางและปลายทาง");
+      return;
+    }
+  
+    if (!btsStations || btsStations.length === 0) {
+      console.warn("btsStations ยังไม่มีข้อมูล");
+      Alert.alert("Error", "ไม่สามารถโหลดข้อมูลสถานีได้");
+      return;
+    }
+  
+    const normalize = name => name?.trim().toLowerCase();
+    const sortedStations = [...btsStations].sort((a, b) => a.order - b.order);
+  
+    const startIndex = sortedStations.findIndex(
+      s => normalize(s.name) === normalize(start.name)
+    );
+    const endIndex = sortedStations.findIndex(
+      s => normalize(s.name) === normalize(end.name)
+    );
+  
+    if (startIndex === -1 || endIndex === -1) {
+      console.warn("ไม่พบสถานีต้นทางหรือปลายทางใน busStations", { start, end });
+      Alert.alert("Error", "ไม่พบสถานีต้นทางหรือปลายทางในรายการ");
+      return;
+    }
+  
+    const selectedStations =
+      startIndex <= endIndex
+        ? sortedStations.slice(startIndex, endIndex + 1)
+        : sortedStations.slice(endIndex, startIndex + 1).reverse();
+  
+    const coordinates = selectedStations.map(station => ({
+      latitude: parseFloat(station.lat),
+      longitude: parseFloat(station.lon),
+    }));
+  
+    setRouteCoordinates(coordinates);
   };
+  
+  
+  
+  
 
   const clearRoute = () => {
     setRouteCoordinates([]); // ลบเส้นทางที่ค้นหา
@@ -74,26 +112,34 @@ const MapScreen = () => {
       >
         {startStation && (
           <Marker
-            coordinate={{ latitude: startStation.lat, longitude: startStation.lon }}
-            title={startStation.name}
-            pinColor="green"
-          />
+          coordinate={{
+            latitude: parseFloat(startStation.lat),
+            longitude: parseFloat(startStation.lon)
+          }}
+          title={startStation.name}
+          pinColor="green"
+        />
         )}
 
         {endStation && endStationVisible && ( // ตรวจสอบสถานะเพื่อแสดงหมุดปลายทาง
           <Marker
-            coordinate={{ latitude: endStation.lat, longitude: endStation.lon }}
-            title={endStation.name}
-            pinColor="red"
-          />
+          coordinate={{
+            latitude: parseFloat(endStation.lat),
+            longitude: parseFloat(endStation.lon)
+          }}
+          title={endStation.name}
+          pinColor="red"
+        />
         )}
 
         {routeCoordinates.length > 0 && (
           <Polyline
-            coordinates={routeCoordinates}
-            strokeWidth={4}
-            strokeColor="blue"
-          />
+          coordinates={routeCoordinates}
+          strokeWidth={5}
+          strokeColor="#008000" // เขียว BTS
+          lineCap="round"
+          lineJoin="round"
+        />        
         )}
       </MapView>
     </View>
