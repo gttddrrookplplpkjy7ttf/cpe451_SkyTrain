@@ -67,15 +67,16 @@ const MapScreen = () => {
   
     setRouteCoordinates(coordinates);
   };
-  
-  
-  
-  
 
   const clearRoute = () => {
-    setRouteCoordinates([]); // ลบเส้นทางที่ค้นหา
-    setEndStationVisible(false); // ซ่อนหมุดปลายทาง
+    setRouteCoordinates([]);
+    setEndStationVisible(false);
+    navigation.navigate("RouteSearch", {
+      startStation: startStation,
+      endStation: null // ล้างปลายทาง
+    });
   };
+  
 
   return (
     <View style={styles.container}>

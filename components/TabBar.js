@@ -20,7 +20,13 @@ const TabBar = ({ state, descriptors, navigation }) => {
         return (
           <TouchableOpacity
             key={index}
-            onPress={() => navigation.navigate(route.name)}
+            onPress={() => {
+              if (route.name === "หน้าหลัก") {
+                navigation.navigate("หน้าหลัก", { screen: "Home" }); // <-- ไปที่ HomeScreen ภายใน Stack
+              } else {
+                navigation.navigate(route.name);
+              }
+            }}
             style={styles.tabButton}
           >
             <View style={styles.iconWrapper}>

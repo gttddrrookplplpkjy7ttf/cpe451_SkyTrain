@@ -1,11 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { btsStations } from './BusStation';
-import { useFocusEffect } from '@react-navigation/native';
-import { useCallback } from 'react';
-
 
 // คำนวณระยะทางระหว่าง 2 จุด (Haversine Formula)
 const getDistance = (lat1, lon1, lat2, lon2) => {
@@ -31,11 +28,18 @@ const RouteSearchScreen = () => {
 
   // รีเซ็ตค่าทุกครั้งที่เข้ามาหน้านี้ใหม่
 useFocusEffect(
-  useCallback(() => {
-    setEndText('');
-    setEndStation(null);
-    setFilteredStations(btsStations);
-  }, [])
+  React.useCallback(() => {
+    if (route.params?.startStation) {
+      setStartStation(route.params.startStation);
+    }
+
+    // ล้างปลายทางถ้า param เป็น null
+    if (route.params?.endStation === null) {
+      setEndStation(null);
+    } else if (route.params?.endStation) {
+      setEndStation(route.params.endStation);
+    }
+  }, [route.params])
 );
 
   

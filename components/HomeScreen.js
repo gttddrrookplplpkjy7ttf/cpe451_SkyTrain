@@ -18,7 +18,7 @@ import * as Location from 'expo-location';
 
 const { height, width } = Dimensions.get('window');
 
-const MapScreen = () => {
+const HomeScreen = () => {
   const navigation = useNavigation();
   const [currentLocation, setCurrentLocation] = useState(null);
   const [location, setLocation] = useState(null);
@@ -233,4 +233,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default MapScreen;
+export default HomeScreen;
