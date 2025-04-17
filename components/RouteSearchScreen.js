@@ -1,17 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput, Alert } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { btsStations } from './BusStation';
 
 // คำนวณระยะทางระหว่าง 2 จุด (Haversine Formula)
 const getDistance = (lat1, lon1, lat2, lon2) => {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const toRad = (x) => (x * Math.PI) / 180;
+  const R = 6371e3;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
   const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 };
@@ -22,109 +23,144 @@ const RouteSearchScreen = () => {
   const [endText, setEndText] = useState('');
   const [startStation, setStartStation] = useState(null);
   const [endStation, setEndStation] = useState(null);
-  const [filteredStations, setFilteredStations] = useState(btsStations);
+  const [filteredStations, setFilteredStations] = useState(btsStations); // Default to all stations
+  const [region, setRegion] = useState({
+    latitude: 13.7563,
+    longitude: 100.5018,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
+  });
+  const [marker, setMarker] = useState(null);
+  const [isSelectingStart, setIsSelectingStart] = useState(false);
   const route = useRoute();
-  const { startLocation } = route.params || {}; // รับค่าพิกัดที่ถูกส่งมา
+  const { startLocation } = route.params || {};
 
-  // รีเซ็ตค่าทุกครั้งที่เข้ามาหน้านี้ใหม่
-useFocusEffect(
-  React.useCallback(() => {
-    if (route.params?.startStation) {
-      setStartStation(route.params.startStation);
-    }
+  useFocusEffect(
+    React.useCallback(() => {
+      if (route.params?.startStation) {
+        setStartStation(route.params.startStation);
+      }
 
-    // ล้างปลายทางถ้า param เป็น null
-    if (route.params?.endStation === null) {
-      setEndStation(null);
-    } else if (route.params?.endStation) {
-      setEndStation(route.params.endStation);
-    }
-  }, [route.params])
-);
+      if (route.params?.endStation === null) {
+        setEndStation(null);
+      } else if (route.params?.endStation) {
+        setEndStation(route.params.endStation);
+      }
+    }, [route.params])
+  );
 
-  
   useEffect(() => {
     if (startLocation) {
       findNearestStation(startLocation.latitude, startLocation.longitude, 'start');
     }
   }, [startLocation]);
 
-  useEffect(() => {
-    if (startText) {
-      filterStationsBySearch(startText);
-    } else {
-      setFilteredStations(btsStations);
-    }
-  }, [startText]);
-
-  useEffect(() => {
-    if (endText) {
-      filterStationsByEndSearch(endText);
-    } else {
-      setFilteredStations(btsStations);
-    }
-  }, [endText]);
-
-  const filterStationsByEndSearch = (text) => {
-    const filtered = btsStations
-      .filter(station =>
-        station.name.toLowerCase().includes(text.toLowerCase()) ||
-        station.english.toLowerCase().includes(text.toLowerCase()) ||
-        (station.nearby && station.nearby.some(place => place.toLowerCase().includes(text.toLowerCase())))
-      )
-      .map(station => ({
-        ...station,
-        distance: getDistance(startStation?.lat || 0, startStation?.lon || 0, station.lat, station.lon),
-      }))
-      .sort((a, b) => a.distance - b.distance);
-  
-    setFilteredStations(filtered);
-  };
-  
-
   const findNearestStation = (lat, lon, type) => {
-    const nearestStation = [...btsStations]
-      .map(station => ({
+    const nearestStation = btsStations
+      .map((station) => ({
         ...station,
         distance: getDistance(lat, lon, station.lat, station.lon),
       }))
       .sort((a, b) => a.distance - b.distance)[0];
 
-    if (type === 'start') setStartStation(nearestStation);
-    else setEndStation(nearestStation);
+    if (type === 'start') {
+      setStartStation(nearestStation);
+      setStartText(nearestStation.name);
+    } else {
+      setEndStation(nearestStation);
+      setEndText(nearestStation.name);
+    }
+  };
+
+  const handleSearch = async (text, type) => {
+    if (!text.trim()) { // Check if the input is empty or contains only whitespace
+      setFilteredStations(btsStations); // Reset to all stations if input is empty
+      return;
+    }
+
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${text}&format=json`);
+      const data = await res.json();
+
+      if (data.length === 0) {
+        // Perform approximate matching for station names
+        const filtered = btsStations.filter((station) => {
+          const searchWords = text.toLowerCase().split(' ');
+          const stationName = station.name.toLowerCase();
+          const stationEnglish = station.english.toLowerCase();
+
+          return searchWords.every(
+            (word) => stationName.includes(word) || stationEnglish.includes(word)
+          );
+        });
+
+        if (filtered.length > 0) {
+          // Show only the nearest station from the filtered list
+          const nearestStation = filtered
+            .map((station) => ({
+              ...station,
+              distance: getDistance(region.latitude, region.longitude, station.lat, station.lon),
+            }))
+            .sort((a, b) => a.distance - b.distance)[0];
+
+          setFilteredStations(nearestStation ? [nearestStation] : btsStations);
+        } else {
+          setFilteredStations(btsStations); // Reset to all stations if no matches
+        }
+        return;
+      }
+
+      const { lat, lon, display_name } = data[0];
+      const latitude = parseFloat(lat);
+      const longitude = parseFloat(lon);
+
+      setRegion({
+        ...region,
+        latitude,
+        longitude,
+      });
+
+      setMarker({ latitude, longitude, title: display_name });
+
+      // Find only the nearest station
+      const nearestStation = btsStations
+        .map((station) => ({
+          ...station,
+          distance: getDistance(latitude, longitude, station.lat, station.lon),
+        }))
+        .sort((a, b) => a.distance - b.distance)[0];
+
+      setFilteredStations(nearestStation ? [nearestStation] : []);
+      setIsSelectingStart(type === 'start');
+    } catch (err) {
+      Alert.alert('เกิดข้อผิดพลาดในการค้นหา');
+    }
+  };
+
+  const selectStation = (station) => {
+    if (isSelectingStart) {
+      setStartStation(station);
+      setStartText(station.name);
+    } else {
+      setEndStation(station);
+      setEndText(station.name);
+    }
+    setFilteredStations(btsStations); // Reset to all stations after selection
   };
 
   const onPress = () => {
     if (startStation && endStation) {
-      navigation.navigate('Map', { startStation, endStation }); // ส่งข้อมูลสถานีต้นทางและปลายทางไปยัง MapScreen
+      navigation.navigate('Map', { startStation, endStation });
     } else {
-      alert('กรุณากรอกสถานีต้นทางและปลายทาง');
+      Alert.alert('กรุณากรอกสถานีต้นทางและปลายทาง');
     }
-  };
-  
-
-  const handleStartTextChange = (text) => {
-    setStartText(text);
-
-    // ถ้าผู้ใช้ลบข้อความทั้งหมดให้กำหนด startStation เป็น null
-    if (text === '') {
-      setStartStation(null);
-    }
-  };
-
-  const filterStationsBySearch = (text) => {
-    const filtered = btsStations.filter(station =>
-      station.name.toLowerCase().includes(text.toLowerCase()) ||
-      station.english.toLowerCase().includes(text.toLowerCase())
-    );
-    setFilteredStations(filtered);
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={28} color="black"/>
+          <Ionicons name="arrow-back" size={28} color="black" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>ค้นหาเส้นทาง</Text>
       </View>
@@ -133,8 +169,11 @@ useFocusEffect(
         style={styles.input}
         placeholder="พิมพ์สถานที่ต้นทาง..."
         placeholderTextColor="#666"
-        value={startText || (startStation ? startStation.name : '')} // ถ้า startText ว่างให้ใช้ชื่อสถานีต้นทางที่ใกล้ที่สุด
-        onChangeText={handleStartTextChange} // ใช้ฟังก์ชันใหม่ที่ปรับปรุง
+        value={startText}
+        onChangeText={(text) => {
+          setStartText(text);
+          handleSearch(text, 'start');
+        }}
       />
 
       <TextInput
@@ -142,7 +181,10 @@ useFocusEffect(
         placeholder="พิมพ์สถานที่ปลายทาง..."
         placeholderTextColor="#666"
         value={endText}
-        onChangeText={setEndText}
+        onChangeText={(text) => {
+          setEndText(text);
+          handleSearch(text, 'end');
+        }}
       />
 
       <TouchableOpacity style={styles.searchButton} onPress={onPress}>
@@ -150,20 +192,12 @@ useFocusEffect(
       </TouchableOpacity>
 
       <FlatList
-        data={filteredStations} // ใช้ filteredStations แทน btsStations
-        keyExtractor={item => item.id}
+        data={filteredStations}
+        keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.stationItem}
-            onPress={() => {
-              if (!startStation) {
-                setStartStation(item);
-                setStartText(item.name); // กำหนดข้อความที่จะแสดงในฟิลด์ต้นทาง
-              } else if (!endStation) {
-                setEndStation(item);
-                setEndText(item.name); // กำหนดข้อความที่จะแสดงในฟิลด์ปลายทาง
-              }
-            }}
+            onPress={() => selectStation(item)}
           >
             <View style={styles.stationIcon}>
               <Text style={styles.stationText}>{item.id}</Text>
@@ -175,6 +209,7 @@ useFocusEffect(
           </TouchableOpacity>
         )}
       />
+
     </View>
   );
 };
